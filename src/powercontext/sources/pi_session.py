@@ -181,7 +181,7 @@ def parse_pi_session(value: PiSessionInput) -> tuple[PiEventInput, ...]:
             PiEventInput(
                 session_id=session_id,
                 event_id=record["id"],
-                parent_id=record["parentId"] or None,
+                parent_id=record["parentId"],
                 event_type=record["type"],
                 role=role,
                 content=content,
@@ -198,7 +198,9 @@ def _parse_archive(value: PiSessionInput) -> tuple[str, dict[str, dict[str, Any]
         raise ValueError("Pi session must be valid UTF-8 JSONL") from error  # noqa: TRY003
     records: list[Any] = []
     try:
-        for line in text.splitlines():
+        for line in text.split("\n"):
+            if line.endswith("\r"):
+                line = line[:-1]
             if line.strip():
                 records.append(json.loads(line, parse_constant=_reject_json_constant))
     except (json.JSONDecodeError, TypeError) as error:
@@ -207,7 +209,8 @@ def _parse_archive(value: PiSessionInput) -> tuple[str, dict[str, dict[str, Any]
         raise ValueError("Pi session must begin with a session header")  # noqa: TRY003
     header = records[0]
     session_id = header.get("id")
-    if header.get("type") != "session" or header.get("version") != 3:
+    version = header.get("version")
+    if header.get("type") != "session" or not isinstance(version, int) or isinstance(version, bool) or version != 3:
         raise ValueError("Pi session header must have type=session and version=3")  # noqa: TRY003
     if not isinstance(session_id, str) or not session_id:
         raise ValueError("Pi session id must be a non-empty string")  # noqa: TRY003
@@ -248,7 +251,11 @@ def _text_content(content: Any) -> str:
         return content
     if not isinstance(content, list):
         return ""
-    pieces = [block["text"] for block in content if isinstance(block, dict) and block.get("type") == "text" and isinstance(block.get("text"), str)]
+    pieces = [
+        block["text"]
+        for block in content
+        if isinstance(block, dict) and block.get("type") == "text" and isinstance(block.get("text"), str)
+    ]
     return "\n".join(pieces)
 
 
@@ -279,8 +286,8 @@ def _visible_event(record: dict[str, Any]) -> tuple[str, str] | None:
         text = _text_content(message.get("content"))
         tool_name = message.get("toolName", "")
         call_id = message.get("toolCallId", "")
-        body = f"[tool_result {tool_name} {call_id}] {text}".rstrip()
-        return ("toolResult", body) if text else None
+        body = f"[tool_result {tool_name} {call_id}] {text}"
+        return "toolResult", body
     if not isinstance(role, str) or not role:
         return None
     content = message.get("content")
@@ -301,7 +308,7 @@ def _visible_event(record: dict[str, Any]) -> tuple[str, str] | None:
                 block.get("arguments"), ensure_ascii=False, sort_keys=True, separators=(",", ":")
             )
             parts.append(f"[tool_call {name} {call_id}] {arguments}")
-    body = "\n".join(part for part in parts if part)
+    body = "\n".join(parts)
     return (role, body) if body else None
 
 
