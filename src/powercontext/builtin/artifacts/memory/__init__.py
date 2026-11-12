@@ -39,6 +39,7 @@ from powercontext.builtin.artifacts.memory.extraction import (
     MemoryExtractionIntent,
     MemoryExtractionOutput,
 )
+from powercontext.builtin.artifacts.memory.http_reranker import HTTPMemoryReranker
 from powercontext.builtin.artifacts.memory.models import (
     EmbeddingProfile,
     Memory,
@@ -120,6 +121,7 @@ __all__ = [
     "InvalidMemoryCandidateError",
     "InvalidMemoryCitationError",
     "InvalidMemoryEvidenceError",
+    "HTTPMemoryReranker",
     "KnownMemoryEntryKind",
     "LLMMemoryCandidatePipeline",
     "LLMMemoryReranker",
